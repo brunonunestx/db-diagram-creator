@@ -9,6 +9,7 @@ import { LoggerService } from '../logger/logger.service';
 @Injectable()
 export class JwtService {
   private readonly secret: string = env.JWT_SECRET;
+  private readonly refreshSecret: string = env.JWT_REFRESH_SECRET;
   private context = 'Jwt';
 
   constructor(private readonly logger: LoggerService) {}
@@ -17,14 +18,44 @@ export class JwtService {
     if (
       (user.email === 'bruno.teixeira@gmail.com', user.password === 'teste')
     ) {
-      const token = jwt.sign(user, this.secret, { expiresIn: '24h' });
-      return { accessToken: token };
+      const accessToken = jwt.sign(user, this.secret, { expiresIn: '24h' });
+
+      const refreshToken = jwt.sign(user, this.refreshSecret, {
+        expiresIn: '7d',
+      });
+
+      return { accessToken, refreshToken };
     }
   }
 
-  validateToken(token: string) {
+  refreshToken(refreshToken: string): LoginResponse {
+    const validUserInfo = this.validateRefreshToken(refreshToken);
+
+    if (!validUserInfo) {
+      throw new UnauthorizedException(exceptions.auth.invalidCredentials.error);
+    }
+
+    const newAccessToken = jwt.sign(validUserInfo, this.secret, {
+      expiresIn: '24h',
+    });
+
+    return { accessToken: newAccessToken, refreshToken };
+  }
+
+  validateAccessToken(token: string) {
     try {
       return jwt.verify(token, this.secret);
+    } catch (error) {
+      this.logger.log(exceptions.auth.invalidCredentials.error, this.context);
+      throw new UnauthorizedException(
+        exceptions.auth.invalidCredentials.friendlyMessage,
+      );
+    }
+  }
+
+  validateRefreshToken(token: string) {
+    try {
+      return jwt.verify(token, this.refreshSecret);
     } catch (error) {
       this.logger.log(exceptions.auth.invalidCredentials.error, this.context);
       throw new UnauthorizedException(

@@ -6,9 +6,11 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { JwtService } from '../jwt/jwt.service';
 
+@Injectable()
 export class AuthGuard {
-  constructor() {}
+  constructor(private readonly jwt: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = this.getRequest(context);
@@ -19,7 +21,9 @@ export class AuthGuard {
         exceptions.auth.invalidCredentials.friendlyMessage,
       );
 
-    return true;
+    const isValid = this.jwt.validateAccessToken(token);
+
+    return !!isValid;
   }
 
   private getToken(request: Request) {
